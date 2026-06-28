@@ -1,14 +1,12 @@
 {
-  "name": "cf-worker-ip-sub-web",
+  "name": "cloudflaresub-server",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "check": "node tests/smoke.mjs"
+    "start": "node server.js"
   },
-  "devDependencies": {
-    "wrangler": "^4.0.0"
+  "dependencies": {
+    "express": "^4.18.2"
   }
 }
