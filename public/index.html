@@ -73,6 +73,61 @@ cf.example.com:443#US-Edge"
             </div>
           </div>
 
+          <details class="template-section">
+            <summary>4. Clash 规则模板（可选）</summary>
+            <p class="hint">
+              定义完整的 Clash 配置，包括策略组和分流规则。占位符说明：
+              <code>__PROXIES__</code> = 自动生成的节点列表，
+              <code>__PROXY_NAMES__</code> = 所有节点名称的 YAML 列表。
+              留空则使用默认配置（仅含"自动选择"和"节点选择"两个策略组）。
+            </p>
+            <textarea
+              id="clashTemplate"
+              name="clashTemplate"
+              rows="12"
+              placeholder="mixed-port: 7890
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: true
+
+proxies:
+__PROXIES__
+
+proxy-groups:
+  - name: &quot;🚀 节点选择&quot;
+    type: select
+    proxies:
+      - &quot;♻️ 自动选择&quot;
+__PROXY_NAMES__
+      - DIRECT
+
+  - name: &quot;♻️ 自动选择&quot;
+    type: url-test
+    url: &quot;http://www.gstatic.com/generate_204&quot;
+    interval: 300
+    tolerance: 50
+    proxies:
+__PROXY_NAMES__
+
+  - name: &quot;🌍 国外媒体&quot;
+    type: select
+    proxies:
+      - &quot;🚀 节点选择&quot;
+      - DIRECT
+
+rules:
+  - DOMAIN-SUFFIX,google.com,🌍 国外媒体
+  - DOMAIN-SUFFIX,youtube.com,🌍 国外媒体
+  - DOMAIN-SUFFIX,github.com,🚀 节点选择
+  - GEOIP,CN,DIRECT
+  - MATCH,🚀 节点选择"
+            ></textarea>
+            <div class="actions">
+              <button id="fillClashTemplateBtn" type="button" class="secondary small">填入演示模板</button>
+            </div>
+          </details>
+
           <div class="actions">
             <button id="submitBtn" type="submit">生成订阅</button>
             <button id="fillDemoBtn" type="button" class="secondary">填入演示数据</button>
@@ -83,8 +138,8 @@ cf.example.com:443#US-Edge"
           <h2>说明</h2>
           <ul>
             <li>不会帮你找优选 IP，只负责把你现成的优选 IP 替换进节点。</li>
-            <li>生成的链接是“同一份节点内容”的不同导出格式，分别给不同客户端使用。</li>
-            <li>推荐勾选“保留原 Host / SNI”，这样更适合 Cloudflare CDN 场景。</li>
+            <li>生成的链接是"同一份节点内容"的不同导出格式，分别给不同客户端使用。</li>
+            <li>推荐勾选"保留原 Host / SNI"，这样更适合 Cloudflare CDN 场景。</li>
             <li>订阅链接里的节点信息会通过服务端密钥加密，请不要把链接公开分享。</li>
           </ul>
 
@@ -112,7 +167,7 @@ cf.example.com:443#US-Edge"
         <div id="warningBox" class="warning hidden"></div>
 
         <div id="emptyState" class="empty-state">
-          还没有生成订阅。请先填写节点链接和优选 IP，然后点击“生成订阅”。
+          还没有生成订阅。请先填写节点链接和优选 IP，然后点击"生成订阅"。
         </div>
 
         <div id="statsGrid" class="stats-grid">
