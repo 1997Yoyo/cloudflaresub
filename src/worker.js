@@ -216,7 +216,7 @@ function renderRaw(nodes) {
 }
 
 /**
- * Render proxies as Yaml list items
+ * Render proxy definitions as YAML list items
  */
 function renderProxyList(nodes) {
   return nodes
@@ -307,36 +307,54 @@ function renderProxyList(nodes) {
 }
 
 /**
- * Render full Clash YAML with optional template injection.
- * When nodes payload contains a `clashTemplate`, substitute placeholders:
- *   __PROXIES__       → the rendered proxy definitions
- *   __PROXY_NAMES__   → YAML list items of all proxy names (for proxy-groups)
+ * Parse custom rule lines and extract unique strategy group names
  */
-function renderClash(nodes, clashTemplate) {
-  const proxies = renderProxyList(nodes);
-
-  // Template injection mode
-  if (clashTemplate && typeof clashTemplate === 'string' && clashTemplate.trim()) {
-    const proxyNamesYaml = nodes
-      .map((node) => `      - "${escapeYaml(node.name)}"`)
-      .join('\n');
-    return clashTemplate
-      .replace(/__PROXIES__/g, proxies.join('\n'))
-      .replace(/__PROXY_NAMES__/g, proxyNamesYaml || '      - DIRECT');
+function parseCustomRuleGroups(ruleLines) {
+  const groups = new Set();
+  for (const line of ruleLines) {
+    const parts = line.split(',');
+    if (parts.length >= 3) {
+      const group = parts[parts.length - 1].trim();
+      if (group && group !== 'DIRECT' && group !== 'REJECT' && group !== 'PASS') {
+        groups.add(group);
+      }
+    }
   }
+  return groups;
+}
 
-  // Default fallback (original behavior)
-  const proxyNames = nodes.map(
+/**
+ * Render full Clash YAML with auto-generated proxy-groups from custom rules.
+ * When customRules is provided, parse group names from rule lines and generate
+ * corresponding strategy groups automatically.
+ */
+function renderClash(nodes, customRules) {
+  const proxies = renderProxyList(nodes);
+  const proxyNamesYaml = nodes.map(
     (node) => `      - "${escapeYaml(node.name)}"`
   );
 
-  const allGroupMembers = [
-    `      - "自动选择"`,
-    ...proxyNames,
-    `      - DIRECT`,
-  ];
+  let ruleLines = [];
+  let extraGroups = [];
 
-  const autoGroupMembers = proxyNames.length ? proxyNames : [`      - DIRECT`];
+  if (customRules && typeof customRules === 'string' && customRules.trim()) {
+    ruleLines = customRules.split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const groupNames = parseCustomRuleGroups(ruleLines);
+    for (const name of groupNames) {
+      if (name === '🚀 节点选择') continue;
+      extraGroups.push(
+        `  - name: "${escapeYaml(name)}"`,
+        `    type: select`,
+        `    proxies:`,
+        `      - "🚀 节点选择"`,
+        `      - DIRECT`,
+        ``
+      );
+    }
+  }
 
   return [
     `mixed-port: 7890`,
@@ -349,21 +367,26 @@ function renderClash(nodes, clashTemplate) {
     ...(proxies.length ? proxies : []),
     ``,
     `proxy-groups:`,
-    `  - name: "自动选择"`,
+    `  - name: "♻️ 自动选择"`,
     `    type: url-test`,
     `    url: "http://www.gstatic.com/generate_204"`,
     `    interval: 300`,
     `    tolerance: 50`,
     `    proxies:`,
-    ...autoGroupMembers,
+    ...proxyNamesYaml,
     ``,
-    `  - name: "节点选择"`,
+    `  - name: "🚀 节点选择"`,
     `    type: select`,
     `    proxies:`,
-    ...allGroupMembers,
+    `      - "♻️ 自动选择"`,
+    ...proxyNamesYaml,
+    `      - DIRECT`,
     ``,
+    ...extraGroups,
     `rules:`,
-    `  - MATCH,节点选择`,
+    ...(ruleLines.length
+      ? ruleLines.map((r) => `  - ${r.startsWith('- ') ? r.slice(2) : r}`)
+      : [`  - MATCH,🚀 节点选择`]),
   ].join('\n');
 }
 
@@ -441,7 +464,7 @@ async function buildDedupHash(body) {
     preferredIps: normalizeLines(body.preferredIps || ''),
     namePrefix: String(body.namePrefix || '').trim(),
     keepOriginalHost: body.keepOriginalHost !== false,
-    clashTemplate: normalizeLines(body.clashTemplate || ''),
+    customRules: normalizeLines(body.customRules || ''),
   };
   return sha256Hex(JSON.stringify(normalized));
 }
@@ -467,13 +490,13 @@ async function handleGenerate(request, env, url) {
 
   const nodes = buildNodes(baseNodes, preferredEndpoints, options);
 
-  const clashTemplate = body.clashTemplate || '';
+  const customRules = body.customRules || '';
   const payload = {
-    version: 2,
+    version: 3,
     createdAt: new Date().toISOString(),
     options,
     nodes,
-    ...(clashTemplate.trim() ? { clashTemplate } : {}),
+    ...(customRules.trim() ? { customRules } : {}),
   };
 
   const dedupHash = await buildDedupHash(body);
@@ -553,11 +576,11 @@ async function handleSub(url, env) {
 
   const record = JSON.parse(raw);
   const nodes = record.nodes || [];
-  const clashTemplate = record.clashTemplate || '';
+  const customRules = record.customRules || '';
   const target = (url.searchParams.get('target') || 'raw').toLowerCase();
 
   if (target === 'clash') {
-    return text(renderClash(nodes, clashTemplate), 200, 'text/yaml; charset=utf-8');
+    return text(renderClash(nodes, customRules), 200, 'text/yaml; charset=utf-8');
   }
   if (target === 'surge') {
     return text(
