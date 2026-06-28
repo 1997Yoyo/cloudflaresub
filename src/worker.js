@@ -594,26 +594,32 @@ async function handleSub(url, env) {
 
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
+    try {
+      const url = new URL(request.url);
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'access-control-allow-origin': '*',
-          'access-control-allow-methods': 'GET,POST,OPTIONS',
-          'access-control-allow-headers': 'content-type',
-        },
-      });
+      if (request.method === 'OPTIONS') {
+        return new Response(null, {
+          headers: {
+            'access-control-allow-origin': '*',
+            'access-control-allow-methods': 'GET,POST,OPTIONS',
+            'access-control-allow-headers': 'content-type',
+          },
+        });
+      }
+
+      if (request.method === 'POST' && url.pathname === '/api/generate') {
+        return await handleGenerate(request, env, url);
+      }
+
+      if (request.method === 'GET' && url.pathname.startsWith('/sub/')) {
+        return await handleSub(url, env);
+      }
+
+      return env.ASSETS.fetch(request);
+    } catch (err) {
+      return json({ ok: false, error: err.message, stack: err.stack }, 500);
     }
-
-    if (request.method === 'POST' && url.pathname === '/api/generate') {
-      return handleGenerate(request, env, url);
-    }
-
-    if (request.method === 'GET' && url.pathname.startsWith('/sub/')) {
-      return handleSub(url, env);
-    }
-
-    return env.ASSETS.fetch(request);
   },
+};
+
 };
