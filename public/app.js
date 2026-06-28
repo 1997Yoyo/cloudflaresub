@@ -33,49 +33,6 @@ fillDemoBtn.addEventListener('click', () => {
   document.getElementById('keepOriginalHost').checked = true;
 });
 
-const fillTemplateBtn = document.getElementById('fillClashTemplateBtn');
-if (fillTemplateBtn) {
-  fillTemplateBtn.addEventListener('click', () => {
-    document.getElementById('clashTemplate').value = `mixed-port: 7890
-allow-lan: false
-mode: rule
-log-level: info
-ipv6: true
-
-proxies:
-__PROXIES__
-
-proxy-groups:
-  - name: "🚀 节点选择"
-    type: select
-    proxies:
-      - "♻️ 自动选择"
-__PROXY_NAMES__
-      - DIRECT
-
-  - name: "♻️ 自动选择"
-    type: url-test
-    url: "http://www.gstatic.com/generate_204"
-    interval: 300
-    tolerance: 50
-    proxies:
-__PROXY_NAMES__
-
-  - name: "🌍 国外媒体"
-    type: select
-    proxies:
-      - "🚀 节点选择"
-      - DIRECT
-
-rules:
-  - DOMAIN-SUFFIX,google.com,🌍 国外媒体
-  - DOMAIN-SUFFIX,youtube.com,🌍 国外媒体
-  - DOMAIN-SUFFIX,github.com,🚀 节点选择
-  - GEOIP,CN,DIRECT
-  - MATCH,🚀 节点选择`;
-  });
-}
-
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   warningBox.classList.add('hidden');
@@ -86,7 +43,7 @@ form.addEventListener('submit', async (event) => {
     preferredIps: document.getElementById('preferredIps').value,
     namePrefix: document.getElementById('namePrefix').value,
     keepOriginalHost: document.getElementById('keepOriginalHost').checked,
-    clashTemplate: document.getElementById('clashTemplate').value,
+    customRules: document.getElementById('customRules').value,
   };
 
   submitBtn.disabled = true;
