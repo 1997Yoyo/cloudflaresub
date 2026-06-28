@@ -178,6 +178,7 @@ function sha256Hex(i) { return createHash('sha256').update(i).digest('hex'); }
 function buildDedupHash(b) { return sha256Hex(JSON.stringify({ nodeLinks: normalizeLines(b.nodeLinks), preferredIps: normalizeLines(b.preferredIps), namePrefix: String(b.namePrefix || '').trim(), keepOriginalHost: b.keepOriginalHost !== false, customRules: normalizeLines(b.customRules) })); }
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(express.static(PUBLIC_DIR));
 
@@ -193,8 +194,7 @@ app.post('/api/generate', (req, res) => {
     const dedupHash = buildDedupHash(body);
     let id = kvGet('dedup:' + dedupHash);
     if (!id) { id = createShortId(); kvPut('sub:' + id, { version: 3, createdAt: new Date().toISOString(), nodes, ...(customRules.trim() ? { customRules } : {}) }); kvPut('dedup:' + dedupHash, id); }
-    const port = req.socket.localPort || 3000;
-    const origin = `${req.protocol}://${req.hostname}${port !== 80 && port !== 443 ? ':' + port : ''}`;
+    const origin = `${req.protocol}://${req.get('host')}`;
     res.json({ ok: true, storage: 'file', deduplicated: true, shortId: id, urls: { auto: origin + '/sub/' + id, raw: origin + '/sub/' + id + '?target=raw', clash: origin + '/sub/' + id + '?target=clash', surge: origin + '/sub/' + id + '?target=surge' }, counts: { inputNodes: baseNodes.length, preferredEndpoints: preferredEndpoints.length, outputNodes: nodes.length }, preview: nodes.slice(0, 20).map(n => ({ name: n.name, type: n.type, server: n.server, port: n.port, host: n.host || '', sni: n.sni || '' })) });
   } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
