@@ -215,8 +215,11 @@ function renderRaw(nodes) {
   return b64EncodeUtf8(lines.join('\n'));
 }
 
-function renderClash(nodes) {
-  const proxies = nodes
+/**
+ * Render proxies as Yaml list items
+ */
+function renderProxyList(nodes) {
+  return nodes
     .map((node) => {
       if (node.type === 'vmess') {
         const lines = [
@@ -231,11 +234,9 @@ function renderClash(nodes) {
           `    tls: ${node.tls ? 'true' : 'false'}`,
           `    network: ${node.network || 'ws'}`,
         ];
-
         if (node.sni) {
           lines.push(`    servername: "${escapeYaml(node.sni)}"`);
         }
-
         if ((node.network || 'ws') === 'ws') {
           lines.push(
             `    ws-opts:`,
@@ -244,7 +245,6 @@ function renderClash(nodes) {
             `        Host: "${escapeYaml(node.host || node.sni || '')}"`
           );
         }
-
         return lines.join('\n');
       }
 
@@ -259,11 +259,9 @@ function renderClash(nodes) {
           `    tls: ${node.tls ? 'true' : 'false'}`,
           `    network: ${node.network || 'ws'}`,
         ];
-
         if (node.sni) {
           lines.push(`    servername: "${escapeYaml(node.sni)}"`);
         }
-
         if ((node.network || 'ws') === 'ws') {
           lines.push(
             `    ws-opts:`,
@@ -272,7 +270,6 @@ function renderClash(nodes) {
             `        Host: "${escapeYaml(node.host || node.sni || '')}"`
           );
         }
-
         return lines.join('\n');
       }
 
@@ -285,19 +282,15 @@ function renderClash(nodes) {
           `    password: "${escapeYaml(node.password || '')}"`,
           `    udp: true`,
         ];
-
         if (node.sni) {
           lines.push(`    sni: "${escapeYaml(node.sni)}"`);
         }
-
         if (node.tls !== false) {
           lines.push(`    tls: true`);
         }
-
         if (node.network) {
           lines.push(`    network: ${node.network}`);
         }
-
         if (node.network === 'ws') {
           lines.push(
             `    ws-opts:`,
@@ -306,14 +299,33 @@ function renderClash(nodes) {
             `        Host: "${escapeYaml(node.host || node.sni || '')}"`
           );
         }
-
         return lines.join('\n');
       }
-
       return '';
     })
     .filter(Boolean);
+}
 
+/**
+ * Render full Clash YAML with optional template injection.
+ * When nodes payload contains a `clashTemplate`, substitute placeholders:
+ *   __PROXIES__       → the rendered proxy definitions
+ *   __PROXY_NAMES__   → YAML list items of all proxy names (for proxy-groups)
+ */
+function renderClash(nodes, clashTemplate) {
+  const proxies = renderProxyList(nodes);
+
+  // Template injection mode
+  if (clashTemplate && typeof clashTemplate === 'string' && clashTemplate.trim()) {
+    const proxyNamesYaml = nodes
+      .map((node) => `      - "${escapeYaml(node.name)}"`)
+      .join('\n');
+    return clashTemplate
+      .replace(/__PROXIES__/g, proxies.join('\n'))
+      .replace(/__PROXY_NAMES__/g, proxyNamesYaml || '      - DIRECT');
+  }
+
+  // Default fallback (original behavior)
   const proxyNames = nodes.map(
     (node) => `      - "${escapeYaml(node.name)}"`
   );
@@ -429,6 +441,7 @@ async function buildDedupHash(body) {
     preferredIps: normalizeLines(body.preferredIps || ''),
     namePrefix: String(body.namePrefix || '').trim(),
     keepOriginalHost: body.keepOriginalHost !== false,
+    clashTemplate: normalizeLines(body.clashTemplate || ''),
   };
   return sha256Hex(JSON.stringify(normalized));
 }
@@ -454,11 +467,13 @@ async function handleGenerate(request, env, url) {
 
   const nodes = buildNodes(baseNodes, preferredEndpoints, options);
 
+  const clashTemplate = body.clashTemplate || '';
   const payload = {
-    version: 1,
+    version: 2,
     createdAt: new Date().toISOString(),
     options,
     nodes,
+    ...(clashTemplate.trim() ? { clashTemplate } : {}),
   };
 
   const dedupHash = await buildDedupHash(body);
@@ -538,10 +553,11 @@ async function handleSub(url, env) {
 
   const record = JSON.parse(raw);
   const nodes = record.nodes || [];
+  const clashTemplate = record.clashTemplate || '';
   const target = (url.searchParams.get('target') || 'raw').toLowerCase();
 
   if (target === 'clash') {
-    return text(renderClash(nodes), 200, 'text/yaml; charset=utf-8');
+    return text(renderClash(nodes, clashTemplate), 200, 'text/yaml; charset=utf-8');
   }
   if (target === 'surge') {
     return text(
