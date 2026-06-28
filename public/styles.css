@@ -564,3 +564,26 @@ button.small {
     gap: 10px;
   }
 }
+
+.template-section {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.template-section summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 0;
+  color: var(--accent);
+}
+
+.template-section[open] summary {
+  margin-bottom: 12px;
+}
+
+.template-section textarea {
+  margin-top: 8px;
+}
